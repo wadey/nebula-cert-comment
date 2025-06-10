@@ -17,21 +17,24 @@ import (
 )
 
 func comment(outBuf, crtBuf *bytes.Buffer) error {
-	c, _, err := cert.UnmarshalNebulaCertificateFromPEM(crtBuf.Bytes())
+	c, _, err := cert.UnmarshalCertificateFromPEM(crtBuf.Bytes())
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintf(outBuf, "# nebula: name=%q", c.Details.Name)
-	if len(c.Details.Groups) > 0 {
-		fmt.Fprintf(outBuf, " groups=%s", strings.Join(c.Details.Groups, ","))
+	fmt.Fprintf(outBuf, "# nebula: name=%q", c.Name())
+	if c.Version() > 1 {
+		fmt.Fprintf(outBuf, " version=%d", c.Version())
 	}
-	fp, err := c.Sha256Sum()
+	if len(c.Groups()) > 0 {
+		fmt.Fprintf(outBuf, " groups=%s", strings.Join(c.Groups(), ","))
+	}
+	fp, err := c.Fingerprint()
 	if err != nil {
 		return err
 	}
 
-	y, m, d := c.Details.NotAfter.UTC().Date()
+	y, m, d := c.NotAfter().UTC().Date()
 	fmt.Fprintf(outBuf, " notAfter=%04d-%02d-%02d", y, m, d)
 	fmt.Fprintf(outBuf, " fingerprint=%s\n", fp)
 
