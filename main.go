@@ -16,6 +16,14 @@ import (
 	"github.com/wadey/nebula-cert-comment/internal/diff"
 )
 
+type processor struct {
+	debug bool
+
+	srcBuf bytes.Buffer
+	outBuf bytes.Buffer
+	crtBuf bytes.Buffer
+}
+
 func comment(outBuf, crtBuf *bytes.Buffer) error {
 	c, _, err := cert.UnmarshalCertificateFromPEM(crtBuf.Bytes())
 	if err != nil {
@@ -41,17 +49,16 @@ func comment(outBuf, crtBuf *bytes.Buffer) error {
 	return nil
 }
 
-func processFile(path string, srcBuf, outBuf, crtBuf *bytes.Buffer) (bool, error) {
+func (p *processor) processFile(path string) (bool, error) {
+	p.srcBuf.Reset()
+	p.outBuf.Reset()
+	p.crtBuf.Reset()
+
 	file, err := os.Open(path)
 	if err != nil {
 		return false, err
 	}
 	defer file.Close()
-
-	// _, err = srcBuf.ReadFrom(file)
-	// if err != nil {
-	// 	return false, err
-	// }
 
 	// Create a new scanner to read the file line by line
 	reader := bufio.NewReader(file)
@@ -72,7 +79,7 @@ func processFile(path string, srcBuf, outBuf, crtBuf *bytes.Buffer) (bool, error
 			}
 		}
 
-		_, err = srcBuf.Write(bs)
+		_, err = p.srcBuf.Write(bs)
 		if err != nil {
 			return foundCert, err
 		}
@@ -81,7 +88,9 @@ func processFile(path string, srcBuf, outBuf, crtBuf *bytes.Buffer) (bool, error
 		if line == 1 {
 			isBinary := bytes.IndexByte(bs, 0) != -1
 			if isBinary {
-				fmt.Fprintf(os.Stderr, "skipping binary file: %q\n", path)
+				if p.debug {
+					fmt.Fprintf(os.Stderr, "skipping binary file: %q\n", path)
+				}
 				break
 			}
 		}
@@ -91,29 +100,29 @@ func processFile(path string, srcBuf, outBuf, crtBuf *bytes.Buffer) (bool, error
 		switch {
 		case strings.HasPrefix(text, "-----BEGIN NEBULA CERTIFICATE-----"):
 			inCert = true
-			crtBuf.WriteString(text)
+			p.crtBuf.WriteString(text)
 		case strings.HasPrefix(text, "-----END NEBULA CERTIFICATE-----"):
 			inCert = false
 			foundCert = true
-			crtBuf.WriteString(text)
+			p.crtBuf.WriteString(text)
 
-			err = comment(outBuf, crtBuf)
+			err = comment(&p.outBuf, &p.crtBuf)
 			if err != nil {
 				return true, err
 			}
 
-			_, err = crtBuf.WriteTo(outBuf)
+			_, err = p.crtBuf.WriteTo(&p.outBuf)
 			if err != nil {
 				return true, err
 			}
-			crtBuf.Reset()
+			p.crtBuf.Reset()
 		case strings.HasPrefix(text, "# nebula: name="):
 			// Skip and regenerate
 		default:
 			if inCert {
-				crtBuf.WriteString(text)
+				p.crtBuf.WriteString(text)
 			} else {
-				outBuf.WriteString(text)
+				p.outBuf.WriteString(text)
 			}
 		}
 
@@ -142,6 +151,7 @@ func main() {
 	flagDiff := flag.Bool("d", false, "display diffs")
 	flagWrite := flag.Bool("w", false, "write result to files")
 	flagList := flag.Bool("l", false, "list files whose comments need updating")
+	flagDebug := flag.Bool("debug", false, "log files we are skipping")
 
 	flagLargeFileLimit := flag.Int64("large-file-limit", 10*1000*1000, "don't process files larger than this in bytes, Set to 0 to disable")
 
@@ -152,15 +162,7 @@ func main() {
 		paths = []string{"."}
 	}
 
-	srcBuf := &bytes.Buffer{}
-	outBuf := &bytes.Buffer{}
-	crtBuf := &bytes.Buffer{}
-
-	// tmpFile, err := os.CreateTemp("", "crt")
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// defer os.Remove(tmpFile.Name()) // clean up
+	p := &processor{debug: *flagDebug}
 
 	for _, path := range paths {
 		err := filepath.WalkDir(path, func(path string, info fs.DirEntry, err error) error {
@@ -175,18 +177,20 @@ func main() {
 				return fmt.Errorf("info %q: %w", path, err)
 			}
 			if *flagLargeFileLimit > 0 && finfo.Size() > *flagLargeFileLimit {
-				fmt.Fprintf(os.Stderr, "skipping large file: %q\n", path)
+				if p.debug {
+					fmt.Fprintf(os.Stderr, "skipping large file: %q\n", path)
+				}
 				return nil
 			}
 			if info.Type()&fs.ModeSymlink != 0 {
-				fmt.Fprintf(os.Stderr, "skipping symlink: %q\n", path)
+				// TODO: follow symlinks?
+				if p.debug {
+					fmt.Fprintf(os.Stderr, "skipping symlink: %q\n", path)
+				}
 				return nil
 			}
 
-			srcBuf.Reset()
-			outBuf.Reset()
-			crtBuf.Reset()
-			found, err := processFile(path, srcBuf, outBuf, crtBuf)
+			found, err := p.processFile(path)
 			if err != nil {
 				return fmt.Errorf("process %q: %w", path, err)
 			}
@@ -195,7 +199,7 @@ func main() {
 					fmt.Println(path)
 				}
 				if *flagDiff {
-					rs := diff.Diff(fmt.Sprintf("%s.orig", path), srcBuf.Bytes(), path, outBuf.Bytes())
+					rs := diff.Diff(fmt.Sprintf("%s.orig", path), p.srcBuf.Bytes(), path, p.outBuf.Bytes())
 					if len(rs) > 0 {
 						_, err = os.Stdout.Write(rs)
 						if err != nil {
@@ -204,7 +208,7 @@ func main() {
 					}
 				}
 				if *flagWrite {
-					err = write(path, outBuf)
+					err = write(path, &p.outBuf)
 					if err != nil {
 						return fmt.Errorf("write %q: %w", path, err)
 					}
