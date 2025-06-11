@@ -169,6 +169,7 @@ type Flags struct {
 	Diff  bool
 	Write bool
 	List  bool
+	Exit  bool
 	Debug bool
 
 	LargeFileLimit int64
@@ -182,6 +183,7 @@ func parseFlags() (*Flags, []string) {
 	flag.BoolVar(&flags.Diff, "d", false, "display diffs")
 	flag.BoolVar(&flags.Write, "w", false, "write result to files")
 	flag.BoolVar(&flags.List, "l", false, "list files whose comments need updating")
+	flag.BoolVar(&flags.Exit, "e", false, "exit(1) if changes needed/made")
 	flag.BoolVar(&flags.Debug, "debug", false, "log files we are skipping")
 
 	flag.Int64Var(&flags.LargeFileLimit, "large-file-limit", 10*1000*1000, "don't process files larger than this in bytes, Set to 0 to disable")
@@ -238,6 +240,7 @@ func main() {
 
 	p := &processor{debug: flags.Debug, formatters: formatters, commentPrefix: flags.CommentPrefix}
 
+	changed := false
 	for _, path := range paths {
 		err := filepath.WalkDir(path, func(path string, info fs.DirEntry, err error) error {
 			if err != nil {
@@ -271,6 +274,7 @@ func main() {
 			if found {
 				rs := diff.Diff(fmt.Sprintf("%s.orig", path), p.srcBuf.Bytes(), path, p.outBuf.Bytes())
 				if len(rs) > 0 {
+					changed = true
 					if flags.List {
 						fmt.Println(path)
 					}
@@ -294,5 +298,9 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
+	}
+
+	if changed && flags.Exit {
+		os.Exit(1)
 	}
 }

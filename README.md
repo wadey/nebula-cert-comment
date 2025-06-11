@@ -24,6 +24,7 @@ Usage: nebula-cert-comment [OPTION]... [FILE]...
   -d	display diffs
   -debug
     	log files we are skipping
+  -e	exit(1) if changes needed/made
   -format string
     	The formatters to use for the comment (default "name,version:!=1,groups,notAfter,fingerprint")
   -l	list files whose comments need updating
