@@ -189,9 +189,14 @@ func parseFlags() (*Flags, []string) {
 	flag.StringVar(&flags.Format, "format", "name,version:!=1,groups,notAfter,fingerprint", "The formatters to use for the comment")
 
 	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: nebula-cert-comment [OPTION]... [FILE]...\n\n")
 		flag.PrintDefaults()
 
 		fmt.Fprintf(os.Stderr, `
+
+If none of "-d, -l, -w" are specified, defaults to "-d".
+
+If a directory is specified for FILE, it is searched recursively. Symlinks are currently skipped.
 
 Format string is a comma separated list of formatters with optional modifiers (separated by colons)
 
@@ -207,10 +212,14 @@ Format string is a comma separated list of formatters with optional modifiers (s
     Modifiers:
 
         !=<exclusion>  --  omits entry if it matches the exclusion string
-	                       EXAMPLES:  "version:!=1", "curve:!=P256"
+                           EXAMPLES:  "version:!=1", "curve:!=P256"
 `)
 	}
 	flag.Parse()
+
+	if !flags.Diff && !flags.Write && !flags.List {
+		flags.Diff = true
+	}
 
 	return flags, flag.Args()
 }
