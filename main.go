@@ -19,9 +19,17 @@ import (
 type processor struct {
 	debug bool
 
+	// buffer for original source file bytes
 	srcBuf bytes.Buffer
+
+	// buffer for output file bytes
 	outBuf bytes.Buffer
+
+	// buffer for trimmed certificate block bytes
 	crtBuf bytes.Buffer
+
+	// buffer for raw certificate block bytes
+	crtRaw bytes.Buffer
 }
 
 func comment(outBuf, crtBuf *bytes.Buffer) error {
@@ -53,6 +61,7 @@ func (p *processor) processFile(path string) (bool, error) {
 	p.srcBuf.Reset()
 	p.outBuf.Reset()
 	p.crtBuf.Reset()
+	p.crtRaw.Reset()
 
 	file, err := os.Open(path)
 	if err != nil {
@@ -66,6 +75,7 @@ func (p *processor) processFile(path string) (bool, error) {
 	// Loop through the file and read each line
 	line := 1
 	inCert := false
+	certPad := ""
 	foundCert := false
 
 	eof := false
@@ -79,12 +89,7 @@ func (p *processor) processFile(path string) (bool, error) {
 			}
 		}
 
-		_, err = p.srcBuf.Write(bs)
-		if err != nil {
-			return foundCert, err
-		}
-
-		// Check the first buffer for NUL, indicating a binary file
+		// Check first line for binary file indicators
 		if line == 1 {
 			isBinary := bytes.IndexByte(bs, 0) != -1
 			if isBinary {
@@ -95,32 +100,50 @@ func (p *processor) processFile(path string) (bool, error) {
 			}
 		}
 
+		_, err = p.srcBuf.Write(bs)
+		if err != nil {
+			return foundCert, err
+		}
+
 		text := string(bs)
+		trimText := strings.TrimLeft(text, " \t")
 
 		switch {
-		case strings.HasPrefix(text, "-----BEGIN NEBULA CERTIFICATE-----"):
+		case strings.HasPrefix(trimText, "-----BEGIN NEBULA CERTIFICATE-----"):
+			if text[0] != '-' {
+				s := strings.SplitN(text, "-", 2)
+				certPad = s[0]
+			}
 			inCert = true
-			p.crtBuf.WriteString(text)
-		case strings.HasPrefix(text, "-----END NEBULA CERTIFICATE-----"):
-			inCert = false
-			foundCert = true
-			p.crtBuf.WriteString(text)
+			p.crtBuf.WriteString(strings.TrimPrefix(text, certPad))
+			p.crtRaw.WriteString(text)
+		case strings.HasPrefix(trimText, "-----END NEBULA CERTIFICATE-----"):
+			p.crtBuf.WriteString(strings.TrimPrefix(text, certPad))
+			p.crtRaw.WriteString(text)
 
+			p.outBuf.WriteString(certPad)
+			// p.crtBuf.WriteTo(os.Stderr)
 			err = comment(&p.outBuf, &p.crtBuf)
 			if err != nil {
 				return true, err
 			}
 
-			_, err = p.crtBuf.WriteTo(&p.outBuf)
+			_, err = p.crtRaw.WriteTo(&p.outBuf)
 			if err != nil {
 				return true, err
 			}
 			p.crtBuf.Reset()
-		case strings.HasPrefix(text, "# nebula: name="):
+			p.crtRaw.Reset()
+
+			certPad = ""
+			inCert = false
+			foundCert = true
+		case strings.HasPrefix(trimText, "# nebula: name="):
 			// Skip and regenerate
 		default:
 			if inCert {
-				p.crtBuf.WriteString(text)
+				p.crtBuf.WriteString(strings.TrimPrefix(text, certPad))
+				p.crtRaw.WriteString(text)
 			} else {
 				p.outBuf.WriteString(text)
 			}
