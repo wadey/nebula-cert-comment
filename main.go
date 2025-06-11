@@ -269,22 +269,22 @@ func main() {
 				return fmt.Errorf("process %q: %w", path, err)
 			}
 			if found {
-				if flags.List {
-					fmt.Println(path)
-				}
-				if flags.Diff {
-					rs := diff.Diff(fmt.Sprintf("%s.orig", path), p.srcBuf.Bytes(), path, p.outBuf.Bytes())
-					if len(rs) > 0 {
+				rs := diff.Diff(fmt.Sprintf("%s.orig", path), p.srcBuf.Bytes(), path, p.outBuf.Bytes())
+				if len(rs) > 0 {
+					if flags.List {
+						fmt.Println(path)
+					}
+					if flags.Diff {
 						_, err = os.Stdout.Write(rs)
 						if err != nil {
 							return fmt.Errorf("diff %q: %w", path, err)
 						}
 					}
-				}
-				if flags.Write {
-					err = write(path, &p.outBuf)
-					if err != nil {
-						return fmt.Errorf("write %q: %w", path, err)
+					if flags.Write {
+						err = write(path, &p.outBuf)
+						if err != nil {
+							return fmt.Errorf("write %q: %w", path, err)
+						}
 					}
 				}
 			}
