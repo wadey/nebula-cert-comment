@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 
 	"github.com/slackhq/nebula/cert"
@@ -166,11 +167,12 @@ func write(path string, fileBuf *bytes.Buffer) error {
 }
 
 type Flags struct {
-	Diff  bool
-	Write bool
-	List  bool
-	Exit  bool
-	Debug bool
+	Diff    bool
+	Write   bool
+	List    bool
+	Exit    bool
+	Debug   bool
+	Version bool
 
 	LargeFileLimit int64
 	CommentPrefix  string
@@ -185,6 +187,7 @@ func parseFlags() (*Flags, []string) {
 	flag.BoolVar(&flags.List, "l", false, "list files whose comments need updating")
 	flag.BoolVar(&flags.Exit, "e", false, "exit(1) if changes needed/made")
 	flag.BoolVar(&flags.Debug, "debug", false, "log files we are skipping")
+	flag.BoolVar(&flags.Version, "version", false, "print version and exit")
 
 	flag.Int64Var(&flags.LargeFileLimit, "large-file-limit", 10*1000*1000, "don't process files larger than this in bytes, Set to 0 to disable")
 	flag.StringVar(&flags.CommentPrefix, "comment", "# nebula:", "prefix for comment lines")
@@ -228,6 +231,16 @@ Format string is a comma separated list of formatters with optional modifiers (s
 
 func main() {
 	flags, paths := parseFlags()
+
+	if flags.Version {
+		info, ok := debug.ReadBuildInfo()
+		if ok {
+			fmt.Println(info.Main.Version)
+		} else {
+			fmt.Println("v0.0.0-error")
+		}
+		return
+	}
 
 	if len(paths) == 0 {
 		paths = []string{"."}

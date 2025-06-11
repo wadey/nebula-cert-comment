@@ -20,17 +20,19 @@ t1t1YzB5/8PWCXmVsLwN1Gch2kyOLlkdbVozMIXiGA8=
 Usage: nebula-cert-comment [OPTION]... [FILE]...
 
   -comment string
-    	prefix for comment lines (default "# nebula:")
-  -d	display diffs
+            prefix for comment lines (default "# nebula:")
+  -d        display diffs
   -debug
-    	log files we are skipping
-  -e	exit(1) if changes needed/made
+            log files we are skipping
+  -e        exit(1) if changes needed/made
   -format string
-    	The formatters to use for the comment (default "name,version:!=1,groups,notAfter,fingerprint")
-  -l	list files whose comments need updating
+            The formatters to use for the comment (default "name,version:!=1,groups,notAfter,fingerprint")
+  -l        list files whose comments need updating
   -large-file-limit int
-    	don't process files larger than this in bytes, Set to 0 to disable (default 10000000)
-  -w	write result to files
+            don't process files larger than this in bytes, Set to 0 to disable (default 10000000)
+  -version
+            print version and exit
+  -w        write result to files
 
 
 If none of "-d, -l, -w" are specified, defaults to "-d".
