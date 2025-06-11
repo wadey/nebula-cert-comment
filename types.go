@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -20,6 +21,10 @@ const (
 	FormatGroups                 // groups
 	FormatNotAfter               // notAfter
 	FormatFingerprint            // fingerprint
+)
+
+var (
+	reBasicString = regexp.MustCompile(`^[-:_a-zA-Z0-9]*$`)
 )
 
 func ParseFormatType(s string) FormatType {
@@ -113,5 +118,5 @@ func (f FormatEntry) String(c cert.Certificate) (string, error) {
 
 func (f FormatEntry) AddQuotes(s string) bool {
 	// TODO make configurable?
-	return strings.Contains(s, " ")
+	return !reBasicString.MatchString(s)
 }
