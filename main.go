@@ -19,6 +19,9 @@ import (
 type processor struct {
 	debug bool
 
+	commentPrefix string
+	formatters    []FormatEntry
+
 	// buffer for original source file bytes
 	srcBuf bytes.Buffer
 
@@ -32,27 +35,19 @@ type processor struct {
 	crtRaw bytes.Buffer
 }
 
-func comment(outBuf, crtBuf *bytes.Buffer) error {
+func comment(formatters []FormatEntry, outBuf, crtBuf *bytes.Buffer) error {
 	c, _, err := cert.UnmarshalCertificateFromPEM(crtBuf.Bytes())
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintf(outBuf, "# nebula: name=%q", c.Name())
-	if c.Version() > 1 {
-		fmt.Fprintf(outBuf, " version=%d", c.Version())
+	for _, e := range formatters {
+		err := e.Format(c, outBuf)
+		if err != nil {
+			return err
+		}
 	}
-	if len(c.Groups()) > 0 {
-		fmt.Fprintf(outBuf, " groups=%s", strings.Join(c.Groups(), ","))
-	}
-	fp, err := c.Fingerprint()
-	if err != nil {
-		return err
-	}
-
-	y, m, d := c.NotAfter().UTC().Date()
-	fmt.Fprintf(outBuf, " notAfter=%04d-%02d-%02d", y, m, d)
-	fmt.Fprintf(outBuf, " fingerprint=%s\n", fp)
+	outBuf.WriteRune('\n')
 
 	return nil
 }
@@ -69,10 +64,8 @@ func (p *processor) processFile(path string) (bool, error) {
 	}
 	defer file.Close()
 
-	// Create a new scanner to read the file line by line
 	reader := bufio.NewReader(file)
 
-	// Loop through the file and read each line
 	line := 1
 	inCert := false
 	certPad := ""
@@ -121,13 +114,15 @@ func (p *processor) processFile(path string) (bool, error) {
 			p.crtBuf.WriteString(strings.TrimPrefix(text, certPad))
 			p.crtRaw.WriteString(text)
 
+			// Write the comment line
 			p.outBuf.WriteString(certPad)
-			// p.crtBuf.WriteTo(os.Stderr)
-			err = comment(&p.outBuf, &p.crtBuf)
+			fmt.Fprint(&p.outBuf, p.commentPrefix)
+			err = comment(p.formatters, &p.outBuf, &p.crtBuf)
 			if err != nil {
 				return true, err
 			}
 
+			// Write the raw cert block
 			_, err = p.crtRaw.WriteTo(&p.outBuf)
 			if err != nil {
 				return true, err
@@ -138,7 +133,7 @@ func (p *processor) processFile(path string) (bool, error) {
 			certPad = ""
 			inCert = false
 			foundCert = true
-		case strings.HasPrefix(trimText, "# nebula: name="):
+		case strings.HasPrefix(trimText, p.commentPrefix):
 			// Skip and regenerate
 		default:
 			if inCert {
@@ -170,22 +165,69 @@ func write(path string, fileBuf *bytes.Buffer) error {
 	return nil
 }
 
-func main() {
-	flagDiff := flag.Bool("d", false, "display diffs")
-	flagWrite := flag.Bool("w", false, "write result to files")
-	flagList := flag.Bool("l", false, "list files whose comments need updating")
-	flagDebug := flag.Bool("debug", false, "log files we are skipping")
+type Flags struct {
+	Diff  bool
+	Write bool
+	List  bool
+	Debug bool
 
-	flagLargeFileLimit := flag.Int64("large-file-limit", 10*1000*1000, "don't process files larger than this in bytes, Set to 0 to disable")
+	LargeFileLimit int64
+	CommentPrefix  string
+	Format         string
+}
 
+func parseFlags() (*Flags, []string) {
+	flags := &Flags{}
+
+	flag.BoolVar(&flags.Diff, "d", false, "display diffs")
+	flag.BoolVar(&flags.Write, "w", false, "write result to files")
+	flag.BoolVar(&flags.List, "l", false, "list files whose comments need updating")
+	flag.BoolVar(&flags.Debug, "debug", false, "log files we are skipping")
+
+	flag.Int64Var(&flags.LargeFileLimit, "large-file-limit", 10*1000*1000, "don't process files larger than this in bytes, Set to 0 to disable")
+	flag.StringVar(&flags.CommentPrefix, "comment", "# nebula:", "prefix for comment lines")
+	flag.StringVar(&flags.Format, "format", "name,version:!=1,groups,notAfter,fingerprint", "The formatters to use for the comment")
+
+	flag.Usage = func() {
+		flag.PrintDefaults()
+
+		fmt.Fprintf(os.Stderr, `
+
+Format string is a comma separated list of formatters with optional modifiers (separated by colons)
+
+    Formatters:
+
+        name         --  name of the certificate
+        version      --  version of the certificate
+        curve        --  curve of the certificate
+        groups       --  comma separated list of groups defined on the certificate (omitted if empty)
+        notAfter     --  expiration timestamp in UTC of the certificate, formatted as YYYY-MM-DD
+        fingerprint  --  fingerprint of the certificate
+
+    Modifiers:
+
+        !=<exclusion>  --  omits entry if it matches the exclusion string
+	                       EXAMPLES:  "version:!=1", "curve:!=P256"
+`)
+	}
 	flag.Parse()
 
-	paths := flag.Args()
+	return flags, flag.Args()
+}
+
+func main() {
+	flags, paths := parseFlags()
+
 	if len(paths) == 0 {
 		paths = []string{"."}
 	}
 
-	p := &processor{debug: *flagDebug}
+	formatters, err := ParseFormatEntries(flags.Format)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	p := &processor{debug: flags.Debug, formatters: formatters, commentPrefix: flags.CommentPrefix}
 
 	for _, path := range paths {
 		err := filepath.WalkDir(path, func(path string, info fs.DirEntry, err error) error {
@@ -199,7 +241,7 @@ func main() {
 			if err != nil {
 				return fmt.Errorf("info %q: %w", path, err)
 			}
-			if *flagLargeFileLimit > 0 && finfo.Size() > *flagLargeFileLimit {
+			if flags.LargeFileLimit > 0 && finfo.Size() > flags.LargeFileLimit {
 				if p.debug {
 					fmt.Fprintf(os.Stderr, "skipping large file: %q\n", path)
 				}
@@ -218,10 +260,10 @@ func main() {
 				return fmt.Errorf("process %q: %w", path, err)
 			}
 			if found {
-				if *flagList {
+				if flags.List {
 					fmt.Println(path)
 				}
-				if *flagDiff {
+				if flags.Diff {
 					rs := diff.Diff(fmt.Sprintf("%s.orig", path), p.srcBuf.Bytes(), path, p.outBuf.Bytes())
 					if len(rs) > 0 {
 						_, err = os.Stdout.Write(rs)
@@ -230,7 +272,7 @@ func main() {
 						}
 					}
 				}
-				if *flagWrite {
+				if flags.Write {
 					err = write(path, &p.outBuf)
 					if err != nil {
 						return fmt.Errorf("write %q: %w", path, err)
