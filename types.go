@@ -41,7 +41,8 @@ func ParseFormatType(s string) FormatType {
 type FormatEntry struct {
 	Type FormatType
 
-	Exclude string
+	Exclude   string
+	OmitEmpty bool
 }
 
 func ParseFormatEntries(entries string) ([]FormatEntry, error) {
@@ -69,6 +70,8 @@ func ParseFormatEntry(entry string) (fe FormatEntry, err error) {
 	if len(parts) > 1 {
 		for _, p := range parts[1:] {
 			switch {
+			case p == "?":
+				fe.OmitEmpty = true
 			case strings.HasPrefix(p, "!="):
 				fe.Exclude = strings.TrimPrefix(p, "!=")
 			default:
@@ -84,7 +87,10 @@ func (f FormatEntry) Format(c cert.Certificate, outBuf *bytes.Buffer) error {
 	if err != nil {
 		return err
 	}
-	if s == "" || f.Exclude == s {
+	if f.OmitEmpty && s == "" {
+		return nil
+	}
+	if f.Exclude != "" && f.Exclude == s {
 		return nil
 	}
 

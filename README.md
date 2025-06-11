@@ -26,7 +26,7 @@ Usage: nebula-cert-comment [OPTION]... [FILE]...
             log files we are skipping
   -e        exit(1) if changes needed/made
   -format string
-            The formatters to use for the comment (default "name,version:!=1,groups,notAfter,fingerprint")
+            The formatters to use for the comment (default "name,version:!=1,groups:?,notAfter,fingerprint")
   -l        list files whose comments need updating
   -large-file-limit int
             don't process files larger than this in bytes, Set to 0 to disable (default 10000000)
@@ -54,4 +54,6 @@ Format string is a comma separated list of formatters with optional modifiers (s
 
         !=<exclusion>  --  omits entry if it matches the exclusion string
                            EXAMPLES:  "version:!=1", "curve:!=P256"
+        ?              --  omits entry if blank
+                           EXAMPLES:  "groups:?"
 ```

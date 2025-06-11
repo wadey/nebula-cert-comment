@@ -191,7 +191,7 @@ func parseFlags() (*Flags, []string) {
 
 	flag.Int64Var(&flags.LargeFileLimit, "large-file-limit", 10*1000*1000, "don't process files larger than this in bytes, Set to 0 to disable")
 	flag.StringVar(&flags.CommentPrefix, "comment", "# nebula:", "prefix for comment lines")
-	flag.StringVar(&flags.Format, "format", "name,version:!=1,groups,notAfter,fingerprint", "The formatters to use for the comment")
+	flag.StringVar(&flags.Format, "format", "name,version:!=1,groups:?,notAfter,fingerprint", "The formatters to use for the comment")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: nebula-cert-comment [OPTION]... [FILE]...\n\n")
@@ -218,6 +218,8 @@ Format string is a comma separated list of formatters with optional modifiers (s
 
         !=<exclusion>  --  omits entry if it matches the exclusion string
                            EXAMPLES:  "version:!=1", "curve:!=P256"
+        ?              --  omits entry if blank
+                           EXAMPLES:  "groups:?"
 `)
 	}
 	flag.Parse()
