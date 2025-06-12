@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"net/netip"
 	"regexp"
 	"strconv"
 	"strings"
@@ -14,13 +15,15 @@ import (
 type FormatType int
 
 const (
-	FormatInvalid     FormatType = iota
-	FormatName                   // name
-	FormatVersion                // version
-	FormatCurve                  // curve
-	FormatGroups                 // groups
-	FormatNotAfter               // notAfter
-	FormatFingerprint            // fingerprint
+	FormatInvalid        FormatType = iota
+	FormatName                      // name
+	FormatVersion                   // version
+	FormatCurve                     // curve
+	FormatGroups                    // groups
+	FormatNotAfter                  // notAfter
+	FormatFingerprint               // fingerprint
+	FormatNetworks                  // networks
+	FormatUnsafeNetworks            // unsafeNetworks
 )
 
 var (
@@ -116,6 +119,10 @@ func (f FormatEntry) String(c cert.Certificate) (string, error) {
 		return c.NotAfter().UTC().Format("2006-01-02"), nil
 	case FormatFingerprint:
 		return c.Fingerprint()
+	case FormatNetworks:
+		return strings.Join(netipPrefixesToStrings(c.Networks()), ","), nil
+	case FormatUnsafeNetworks:
+		return strings.Join(netipPrefixesToStrings(c.UnsafeNetworks()), ","), nil
 
 	default:
 		return "", fmt.Errorf("invalid type: %s", f.Type)
@@ -125,4 +132,12 @@ func (f FormatEntry) String(c cert.Certificate) (string, error) {
 func (f FormatEntry) AddQuotes(s string) bool {
 	// TODO make configurable?
 	return !reBasicString.MatchString(s)
+}
+
+func netipPrefixesToStrings(ns []netip.Prefix) []string {
+	ss := make([]string, len(ns))
+	for i, n := range ns {
+		ss[i] = n.String()
+	}
+	return ss
 }

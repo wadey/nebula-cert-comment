@@ -103,7 +103,8 @@ func (p *processor) processFile(path string) (bool, error) {
 		trimText := strings.TrimLeft(text, " \t")
 
 		switch {
-		case strings.HasPrefix(trimText, "-----BEGIN NEBULA CERTIFICATE-----"):
+		case strings.HasPrefix(trimText, "-----BEGIN NEBULA CERTIFICATE-----"),
+			strings.HasPrefix(trimText, "-----BEGIN NEBULA CERTIFICATE V2-----"):
 			if text[0] != '-' {
 				s := strings.SplitN(text, "-", 2)
 				certPad = s[0]
@@ -111,7 +112,8 @@ func (p *processor) processFile(path string) (bool, error) {
 			inCert = true
 			p.crtBuf.WriteString(strings.TrimPrefix(text, certPad))
 			p.crtRaw.WriteString(text)
-		case strings.HasPrefix(trimText, "-----END NEBULA CERTIFICATE-----"):
+		case strings.HasPrefix(trimText, "-----END NEBULA CERTIFICATE-----"),
+			strings.HasPrefix(trimText, "-----END NEBULA CERTIFICATE V2-----"):
 			p.crtBuf.WriteString(strings.TrimPrefix(text, certPad))
 			p.crtRaw.WriteString(text)
 
@@ -191,7 +193,7 @@ func parseFlags() (*Flags, []string) {
 
 	flag.Int64Var(&flags.LargeFileLimit, "large-file-limit", 10*1000*1000, "don't process files larger than this in bytes, Set to 0 to disable")
 	flag.StringVar(&flags.CommentPrefix, "comment", "# nebula:", "prefix for comment lines")
-	flag.StringVar(&flags.Format, "format", "name,version:!=1,groups:?,notAfter,fingerprint", "The formatters to use for the comment")
+	flag.StringVar(&flags.Format, "format", "name,version:!=1,groups:?,networks:?,unsafeNetworks:?,notAfter,fingerprint", "The formatters to use for the comment")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: nebula-cert-comment [OPTION]... [FILE]...\n\n")
@@ -207,12 +209,14 @@ Format string is a comma separated list of formatters with optional modifiers (s
 
     Formatters:
 
-        name         --  name of the certificate
-        version      --  version of the certificate
-        curve        --  curve of the certificate
-        groups       --  comma separated list of groups defined on the certificate (omitted if empty)
-        notAfter     --  expiration timestamp in UTC of the certificate, formatted as YYYY-MM-DD
-        fingerprint  --  fingerprint of the certificate
+        name            --  name of the certificate
+        version         --  version of the certificate
+        curve           --  curve of the certificate
+        groups          --  comma separated list of groups defined on the certificate (omitted if empty)
+        notAfter        --  expiration timestamp in UTC of the certificate, formatted as YYYY-MM-DD
+        fingerprint     --  fingerprint of the certificate
+        networks        --  networks listed in certificate
+        unsafeNetworks  --  unsafeNetworks listed in certificate
 
     Modifiers:
 
