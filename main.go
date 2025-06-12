@@ -213,10 +213,10 @@ Format string is a comma separated list of formatters with optional modifiers (s
         version         --  version of the certificate
         curve           --  curve of the certificate
         groups          --  comma separated list of groups defined on the certificate (omitted if empty)
-        notAfter        --  expiration timestamp in UTC of the certificate, formatted as YYYY-MM-DD
-        fingerprint     --  fingerprint of the certificate
         networks        --  networks listed in certificate
         unsafeNetworks  --  unsafeNetworks listed in certificate
+        notAfter        --  expiration timestamp in UTC of the certificate, formatted as YYYY-MM-DD
+        fingerprint     --  fingerprint of the certificate
 
     Modifiers:
 
