@@ -26,7 +26,7 @@ Usage: nebula-cert-comment [OPTION]... [FILE]...
             log files we are skipping
   -e        exit(1) if changes needed/made
   -format string
-            The formatters to use for the comment (default "name,version:!=1,groups:?,notAfter,fingerprint")
+            The formatters to use for the comment (default "name,version:!=1,groups:?,networks:?,unsafeNetworks:?,notAfter,fingerprint")
   -l        list files whose comments need updating
   -large-file-limit int
             don't process files larger than this in bytes, Set to 0 to disable (default 10000000)
@@ -43,12 +43,14 @@ Format string is a comma separated list of formatters with optional modifiers (s
 
     Formatters:
 
-        name         --  name of the certificate
-        version      --  version of the certificate
-        curve        --  curve of the certificate
-        groups       --  comma separated list of groups defined on the certificate (omitted if empty)
-        notAfter     --  expiration timestamp in UTC of the certificate, formatted as YYYY-MM-DD
-        fingerprint  --  fingerprint of the certificate
+        name            --  name of the certificate
+        version         --  version of the certificate
+        curve           --  curve of the certificate
+        groups          --  comma separated list of groups defined on the certificate (omitted if empty)
+        networks        --  networks listed in certificate
+        unsafeNetworks  --  unsafeNetworks listed in certificate
+        notAfter        --  expiration timestamp in UTC of the certificate, formatted as YYYY-MM-DD
+        fingerprint     --  fingerprint of the certificate
 
     Modifiers:
 
