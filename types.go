@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -21,6 +22,7 @@ const (
 	FormatGroups                 // groups
 	FormatNotAfter               // notAfter
 	FormatFingerprint            // fingerprint
+	FormatJSON                   // json
 )
 
 var (
@@ -94,7 +96,9 @@ func (f FormatEntry) Format(c cert.Certificate, outBuf *bytes.Buffer) error {
 		return nil
 	}
 
-	if f.AddQuotes(s) {
+	if f.Type == FormatJSON {
+		fmt.Fprintf(outBuf, " %s", s)
+	} else if f.AddQuotes(s) {
 		fmt.Fprintf(outBuf, " %s=%q", f.Type, s)
 	} else {
 		fmt.Fprintf(outBuf, " %s=%s", f.Type, s)
@@ -116,7 +120,12 @@ func (f FormatEntry) String(c cert.Certificate) (string, error) {
 		return c.NotAfter().UTC().Format("2006-01-02"), nil
 	case FormatFingerprint:
 		return c.Fingerprint()
-
+	case FormatJSON:
+		j, err := json.Marshal(c)
+		if err != nil {
+			return "", err
+		}
+		return string(j), nil
 	default:
 		return "", fmt.Errorf("invalid type: %s", f.Type)
 	}

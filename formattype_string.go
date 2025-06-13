@@ -15,11 +15,12 @@ func _() {
 	_ = x[FormatGroups-4]
 	_ = x[FormatNotAfter-5]
 	_ = x[FormatFingerprint-6]
+	_ = x[FormatJSON-7]
 }
 
-const _FormatType_name = "FormatInvalidnameversioncurvegroupsnotAfterfingerprint"
+const _FormatType_name = "FormatInvalidnameversioncurvegroupsnotAfterfingerprintjson"
 
-var _FormatType_index = [...]uint8{0, 13, 17, 24, 29, 35, 43, 54}
+var _FormatType_index = [...]uint8{0, 13, 17, 24, 29, 35, 43, 54, 58}
 
 func (i FormatType) String() string {
 	if i < 0 || i >= FormatType(len(_FormatType_index)-1) {
