@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/netip"
 	"regexp"
@@ -24,6 +25,7 @@ const (
 	FormatFingerprint               // fingerprint
 	FormatNetworks                  // networks
 	FormatUnsafeNetworks            // unsafeNetworks
+	FormatJSON                      // json
 )
 
 var (
@@ -97,7 +99,9 @@ func (f FormatEntry) Format(c cert.Certificate, outBuf *bytes.Buffer) error {
 		return nil
 	}
 
-	if f.AddQuotes(s) {
+	if f.Type == FormatJSON {
+		fmt.Fprintf(outBuf, " %s", s)
+	} else if f.AddQuotes(s) {
 		fmt.Fprintf(outBuf, " %s=%q", f.Type, s)
 	} else {
 		fmt.Fprintf(outBuf, " %s=%s", f.Type, s)
@@ -123,6 +127,12 @@ func (f FormatEntry) String(c cert.Certificate) (string, error) {
 		return strings.Join(netipPrefixesToStrings(c.Networks()), ","), nil
 	case FormatUnsafeNetworks:
 		return strings.Join(netipPrefixesToStrings(c.UnsafeNetworks()), ","), nil
+	case FormatJSON:
+		j, err := json.Marshal(c)
+		if err != nil {
+			return "", err
+		}
+		return string(j), nil
 
 	default:
 		return "", fmt.Errorf("invalid type: %s", f.Type)
